@@ -1,5 +1,6 @@
-"""CRUD package – re-exports all CRUD functions."""
+"""CRUD package – re-exports the generic base and all CRUD functions."""
 
+from app.crud.base import CRUDBase
 from app.crud.profile import (
     create_profile,
     delete_profile,
@@ -29,6 +30,8 @@ from app.crud.user import (
 )
 
 __all__ = [
+    # Generic base
+    "CRUDBase",
     # User
     "get_users",
     "get_user",
@@ -53,3 +56,4 @@ __all__ = [
     "update_channel",
     "delete_channel",
 ]
+
