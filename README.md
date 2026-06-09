@@ -6,15 +6,15 @@ A modern, asynchronous REST API built with FastAPI and SQLAlchemy, designed for 
 
 - **FastAPI**: Modern, fast web framework with automatic API documentation
 - **Async/Await**: Full async support for high performance
-- **SQLAlchemy 2.0**: ORM with async support for database operations
+- **SQLAlchemy 2.0**: ORM with async support and typed `Mapped[]` column declarations
 - **SQL Server**: Integrated with ODBC driver for SQL Server compatibility
-- **Alembic**: Database migration management
+- **Alembic**: Database migration management (async-aware `env.py`)
 - **Pydantic**: Data validation and settings management
 - **Environment Configuration**: Secure configuration via `.env` files
 
 ## Requirements
 
-- Python 3.8+
+- Python 3.12+
 - SQL Server database
 - ODBC Driver 18 for SQL Server (for SQL Server connectivity)
 
@@ -41,7 +41,7 @@ pip install -r requirements.txt
    - Copy `.env.example` to `.env` (if available) or create a `.env` file
    - Set your SQL Server connection string:
    ```
-   DATABASE_URL=mssql+aioodbc://user:password@host/database?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes
+   DATABASE_URL=******host/database?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes
    ```
 
 ## Running the Application
@@ -70,14 +70,62 @@ app-api/
 │   │   └── config.py           # Configuration management
 │   ├── crud/                   # CRUD operations
 │   ├── db/
-│   │   ├── base.py             # Database base classes
-│   │   └── session.py          # Database session management
-│   ├── models/                 # SQLAlchemy ORM models
+│   │   ├── base.py             # DeclarativeBase + model imports for Alembic
+│   │   └── session.py          # Async engine and session factory
+│   ├── models/                 # SQLAlchemy 2.0 ORM models
+│   │   ├── user.py             # User model
+│   │   ├── profile.py          # Profile model
+│   │   ├── profile_follow.py   # ProfileFollow model
+│   │   └── profile_channel.py  # ProfileChannel model
 │   └── schemas/                # Pydantic request/response schemas
+├── alembic/
+│   ├── env.py                  # Async-aware Alembic environment
+│   └── versions/               # Migration scripts
+├── tests/                      # Pytest test suite
+│   ├── conftest.py             # Shared async fixtures (SQLite in-memory)
+│   └── test_models.py          # ORM model unit tests
 ├── scripts/                    # Utility scripts
 ├── requirements.txt            # Python dependencies
+├── pytest.ini                  # Pytest configuration
 └── README.md
 ```
+
+## Data Models
+
+The API uses four SQLAlchemy 2.0 ORM models with typed `Mapped[]` columns, integer identity PKs, and explicit bidirectional relationships.
+
+### Column naming convention
+
+ERD fields are defined in camelCase. Python attributes use snake_case throughout:
+
+| ERD (camelCase)  | Python attribute (snake_case) |
+|------------------|-------------------------------|
+| `userId`         | `user_id`                     |
+| `displayName`    | `display_name`                |
+| `passwordHash`   | `password_hash`               |
+| `followerId`     | `follower_id`                 |
+| `profileId`      | `profile_id`                  |
+| `channelName`    | `channel_name`                |
+| `channelUrl`     | `channel_url`                 |
+| `createdAt`      | `created_at`                  |
+| `updatedAt`      | `updated_at`                  |
+
+### Entity relationships
+
+```
+User ──(1-N)──> Profile ──(1-N)──> ProfileFollow
+                        └──(1-N)──> ProfileChannel
+User ──(1-N)──> ProfileFollow  (as follower)
+```
+
+| Model            | Table              | PK | Notable columns                                                        |
+|------------------|--------------------|----|------------------------------------------------------------------------|
+| `User`           | `users`            | id | username, email, password_hash, created_at                             |
+| `Profile`        | `profiles`         | id | user_id (FK→users), display_name, bio, created_at, updated_at          |
+| `ProfileFollow`  | `profile_follows`  | id | follower_id (FK→users), profile_id (FK→profiles), created_at           |
+| `ProfileChannel` | `profile_channels` | id | profile_id (FK→profiles), channel_name, channel_url, created_at, updated_at |
+
+All FK columns use `ondelete="CASCADE"`.
 
 ## Dependencies
 
@@ -89,6 +137,7 @@ app-api/
 - **alembic** - Database migration tool
 - **pydantic-settings** - Settings management
 - **python-dotenv** - Environment variable management
+- **pytest / pytest-asyncio / aiosqlite** - Test infrastructure
 
 ## Configuration
 
@@ -105,14 +154,25 @@ Configuration is managed through environment variables in the `.env` file:
 Use Alembic to manage database schema changes:
 
 ```bash
-# Create a new migration
-alembic revision --autogenerate -m "migration message"
-
-# Apply migrations
+# Apply all pending migrations (creates tables on first run)
 alembic upgrade head
 
-# Revert migrations
+# Revert all migrations (drops all tables)
+alembic downgrade base
+
+# Revert the last migration
 alembic downgrade -1
+
+# Create a new auto-generated migration (requires a running DB)
+alembic revision --autogenerate -m "migration message"
+```
+
+### Running Tests
+
+Tests use an in-memory SQLite database and do **not** require a running SQL Server:
+
+```bash
+pytest
 ```
 
 ### API Routes

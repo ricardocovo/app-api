@@ -6,5 +6,4 @@ class Base(DeclarativeBase):
 
 
 # Import all models here so that Alembic autogenerate can discover them.
-# Uncomment each line as the model file is created in Phase 2.
-# from app.models import user, profile, profile_follow, profile_channel  # noqa: F401
+from app.models import profile, profile_channel, profile_follow, user  # noqa: F401
