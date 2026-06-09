@@ -41,7 +41,7 @@ pip install -r requirements.txt
    - Copy `.env.example` to `.env` (if available) or create a `.env` file
    - Set your SQL Server connection string:
    ```
-   DATABASE_URL=******host/database?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes
+   DATABASE_URL=mssql+pyodbc://username:password@hostname/database?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes
    ```
 
 ## Running the Application

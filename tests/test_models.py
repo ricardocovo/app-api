@@ -6,7 +6,6 @@ behaviour (object creation, relationships, cascade deletes).
 """
 
 import pytest
-import pytest_asyncio
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -39,9 +38,7 @@ def _make_profile(user: User, n: int = 1) -> Profile:
 def test_all_four_tables_in_metadata() -> None:
     """Base.metadata must contain exactly the 4 tables introduced in Phase 2."""
     table_names = set(Base.metadata.tables.keys())
-    assert {"users", "profiles", "profile_follows", "profile_channels"}.issubset(
-        table_names
-    )
+    assert table_names == {"users", "profiles", "profile_follows", "profile_channels"}
 
 
 # ---------------------------------------------------------------------------
