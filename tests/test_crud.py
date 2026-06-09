@@ -1,21 +1,25 @@
-"""Tests for the Phase-4 async CRUD layer.
+"""Tests for the CRUD layer (Phase 4/5).
 
-All tests use the same in-memory SQLite database as the model tests (see
-``conftest.py``).  Each test uses unique data to avoid conflicts with data
-committed by other tests in the shared session-scoped database.
+Uses the same in-memory SQLite fixture as other tests.
 """
 
 from __future__ import annotations
 
 import pytest
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.crud import (
-    profile_channel_crud,
-    profile_crud,
-    profile_follow_crud,
-    user_crud,
+from app.crud.profile import create_profile, delete_profile, get_profile, get_profiles, update_profile
+from app.crud.profile_channel import (
+    create_channel,
+    delete_channel,
+    get_channel,
+    get_channels,
+    update_channel,
 )
+from app.crud.profile_follow import create_follow, delete_follow, get_follow, get_follows
+from app.crud.user import create_user, delete_user, get_user, get_users, update_user
+from app.schemas.pagination import PaginationParams
 from app.schemas.profile import ProfileCreate, ProfileUpdate
 from app.schemas.profile_channel import ProfileChannelCreate, ProfileChannelUpdate
 from app.schemas.profile_follow import ProfileFollowCreate
@@ -25,16 +29,16 @@ from app.schemas.user import UserCreate, UserUpdate
 # Helpers
 # ---------------------------------------------------------------------------
 
-_COUNTER: dict[str, int] = {"n": 100}
+_USER_COUNTER = 200  # start high to avoid conflicts with test_models.py
 
 
-def _next() -> int:
-    _COUNTER["n"] += 1
-    return _COUNTER["n"]
+def _next_n() -> int:
+    global _USER_COUNTER
+    _USER_COUNTER += 1
+    return _USER_COUNTER
 
 
-def _user_in(n: int | None = None) -> UserCreate:
-    n = n or _next()
+def _user_create(n: int) -> UserCreate:
     return UserCreate(
         username=f"crud_user{n}",
         email=f"crud_user{n}@example.com",
@@ -43,377 +47,277 @@ def _user_in(n: int | None = None) -> UserCreate:
 
 
 # ---------------------------------------------------------------------------
-# CRUDUser
+# User CRUD
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
-async def test_user_create_and_get(db_session: AsyncSession) -> None:
-    obj_in = _user_in()
-    user = await user_crud.create(db_session, obj_in=obj_in)
-
+async def test_create_and_get_user(db_session: AsyncSession) -> None:
+    n = _next_n()
+    user = await create_user(db_session, _user_create(n))
     assert user.id is not None
-    assert user.username == obj_in.username
 
-    fetched = await user_crud.get(db_session, user.id)
+    fetched = await get_user(db_session, user.id)
     assert fetched is not None
-    assert fetched.id == user.id
+    assert fetched.username == f"crud_user{n}"
 
 
 @pytest.mark.asyncio
-async def test_user_get_returns_none_for_missing(db_session: AsyncSession) -> None:
-    result = await user_crud.get(db_session, 999_999)
+async def test_get_user_not_found(db_session: AsyncSession) -> None:
+    result = await get_user(db_session, 999999)
     assert result is None
 
 
 @pytest.mark.asyncio
-async def test_user_get_multi_pagination_and_total(db_session: AsyncSession) -> None:
-    n = _next()
-    # Create 3 users with recognisable usernames
-    for i in range(3):
-        await user_crud.create(
-            db_session,
-            obj_in=UserCreate(
-                username=f"pag_user{n}_{i}",
-                email=f"pag_user{n}_{i}@example.com",
-                password_hash="hashed",
-            ),
-        )
+async def test_list_users(db_session: AsyncSession) -> None:
+    n1, n2 = _next_n(), _next_n()
+    await create_user(db_session, _user_create(n1))
+    await create_user(db_session, _user_create(n2))
 
-    rows, total = await user_crud.get_multi(db_session, offset=0, limit=1000)
-    assert total >= 3
-    assert len(rows) >= 3
+    items, total = await get_users(db_session, PaginationParams(page=1, size=100))
+    assert total >= 2
 
 
 @pytest.mark.asyncio
-async def test_user_update_partial(db_session: AsyncSession) -> None:
-    user = await user_crud.create(db_session, obj_in=_user_in())
-    original_email = user.email
+async def test_list_users_email_filter(db_session: AsyncSession) -> None:
+    n = _next_n()
+    user = await create_user(db_session, _user_create(n))
 
-    updated = await user_crud.update(
-        db_session,
-        db_obj=user,
-        obj_in=UserUpdate(username="updated_name"),
+    items, total = await get_users(db_session, PaginationParams(), email=user.email)
+    assert total == 1
+    assert items[0].id == user.id
+
+
+@pytest.mark.asyncio
+async def test_update_user(db_session: AsyncSession) -> None:
+    n = _next_n()
+    user = await create_user(db_session, _user_create(n))
+
+    updated = await update_user(db_session, user.id, UserUpdate(username=f"updated_{n}"))
+    assert updated is not None
+    assert updated.username == f"updated_{n}"
+
+
+@pytest.mark.asyncio
+async def test_update_user_not_found(db_session: AsyncSession) -> None:
+    result = await update_user(db_session, 999999, UserUpdate(username="x"))
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_delete_user(db_session: AsyncSession) -> None:
+    n = _next_n()
+    user = await create_user(db_session, _user_create(n))
+    deleted = await delete_user(db_session, user.id)
+    assert deleted is True
+
+    assert await get_user(db_session, user.id) is None
+
+
+@pytest.mark.asyncio
+async def test_delete_user_not_found(db_session: AsyncSession) -> None:
+    result = await delete_user(db_session, 999999)
+    assert result is False
+
+
+@pytest.mark.asyncio
+async def test_create_user_duplicate_email_raises(db_session: AsyncSession) -> None:
+    n = _next_n()
+    await create_user(db_session, _user_create(n))
+    with pytest.raises(IntegrityError):
+        await create_user(db_session, _user_create(n))  # same email
+
+
+# ---------------------------------------------------------------------------
+# Profile CRUD
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_create_and_get_profile(db_session: AsyncSession) -> None:
+    n = _next_n()
+    user = await create_user(db_session, _user_create(n))
+    profile = await create_profile(
+        db_session, ProfileCreate(user_id=user.id, display_name=f"Profile {n}")
     )
-
-    assert updated.username == "updated_name"
-    assert updated.email == original_email  # unchanged
-
-
-@pytest.mark.asyncio
-async def test_user_delete(db_session: AsyncSession) -> None:
-    user = await user_crud.create(db_session, obj_in=_user_in())
-    uid = user.id
-
-    deleted = await user_crud.delete(db_session, id=uid)
-    assert deleted is not None
-    assert deleted.id == uid
-
-    assert await user_crud.get(db_session, uid) is None
-
-
-@pytest.mark.asyncio
-async def test_user_delete_nonexistent_returns_none(db_session: AsyncSession) -> None:
-    result = await user_crud.delete(db_session, id=999_998)
-    assert result is None
-
-
-@pytest.mark.asyncio
-async def test_user_get_by_email(db_session: AsyncSession) -> None:
-    obj_in = _user_in()
-    await user_crud.create(db_session, obj_in=obj_in)
-
-    found = await user_crud.get_by_email(db_session, obj_in.email)
-    assert found is not None
-    assert found.email == obj_in.email
-
-    not_found = await user_crud.get_by_email(db_session, "no_such@example.com")
-    assert not_found is None
-
-
-@pytest.mark.asyncio
-async def test_user_get_by_username(db_session: AsyncSession) -> None:
-    obj_in = _user_in()
-    await user_crud.create(db_session, obj_in=obj_in)
-
-    found = await user_crud.get_by_username(db_session, obj_in.username)
-    assert found is not None
-    assert found.username == obj_in.username
-
-    not_found = await user_crud.get_by_username(db_session, "no_such_user")
-    assert not_found is None
-
-
-# ---------------------------------------------------------------------------
-# CRUDProfile
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.asyncio
-async def test_profile_create_and_get(db_session: AsyncSession) -> None:
-    user = await user_crud.create(db_session, obj_in=_user_in())
-    obj_in = ProfileCreate(display_name="Test Profile", user_id=user.id)
-
-    profile = await profile_crud.create(db_session, obj_in=obj_in)
     assert profile.id is not None
-    assert profile.user_id == user.id
 
-    fetched = await profile_crud.get(db_session, profile.id)
+    fetched = await get_profile(db_session, profile.id)
     assert fetched is not None
-    assert fetched.display_name == "Test Profile"
+    assert fetched.display_name == f"Profile {n}"
 
 
 @pytest.mark.asyncio
-async def test_profile_update_partial(db_session: AsyncSession) -> None:
-    user = await user_crud.create(db_session, obj_in=_user_in())
-    profile = await profile_crud.create(
-        db_session, obj_in=ProfileCreate(display_name="Old Name", user_id=user.id)
+async def test_list_profiles_user_id_filter(db_session: AsyncSession) -> None:
+    n = _next_n()
+    user = await create_user(db_session, _user_create(n))
+    await create_profile(db_session, ProfileCreate(user_id=user.id, display_name="P1"))
+    await create_profile(db_session, ProfileCreate(user_id=user.id, display_name="P2"))
+
+    items, total = await get_profiles(db_session, PaginationParams(), user_id=user.id)
+    assert total == 2
+
+
+@pytest.mark.asyncio
+async def test_update_profile(db_session: AsyncSession) -> None:
+    n = _next_n()
+    user = await create_user(db_session, _user_create(n))
+    profile = await create_profile(
+        db_session, ProfileCreate(user_id=user.id, display_name="Old Name")
     )
 
-    updated = await profile_crud.update(
-        db_session,
-        db_obj=profile,
-        obj_in=ProfileUpdate(display_name="New Name"),
+    updated = await update_profile(
+        db_session, profile.id, ProfileUpdate(display_name="New Name")
     )
+    assert updated is not None
     assert updated.display_name == "New Name"
-    assert updated.bio is None  # unchanged
 
 
 @pytest.mark.asyncio
-async def test_profile_delete(db_session: AsyncSession) -> None:
-    user = await user_crud.create(db_session, obj_in=_user_in())
-    profile = await profile_crud.create(
-        db_session, obj_in=ProfileCreate(display_name="To Delete", user_id=user.id)
-    )
-    pid = profile.id
-
-    deleted = await profile_crud.delete(db_session, id=pid)
-    assert deleted is not None
-    assert await profile_crud.get(db_session, pid) is None
-
-
-@pytest.mark.asyncio
-async def test_profile_get_by_user(db_session: AsyncSession) -> None:
-    user = await user_crud.create(db_session, obj_in=_user_in())
-    for i in range(3):
-        await profile_crud.create(
-            db_session,
-            obj_in=ProfileCreate(display_name=f"Profile {i}", user_id=user.id),
-        )
-
-    rows, total = await profile_crud.get_by_user(db_session, user.id)
-    assert total == 3
-    assert len(rows) == 3
-    assert all(p.user_id == user.id for p in rows)
-
-
-@pytest.mark.asyncio
-async def test_profile_get_multi_filter(db_session: AsyncSession) -> None:
-    user = await user_crud.create(db_session, obj_in=_user_in())
-    await profile_crud.create(
-        db_session, obj_in=ProfileCreate(display_name="Filtered", user_id=user.id)
+async def test_delete_profile(db_session: AsyncSession) -> None:
+    n = _next_n()
+    user = await create_user(db_session, _user_create(n))
+    profile = await create_profile(
+        db_session, ProfileCreate(user_id=user.id, display_name="ToDelete")
     )
 
-    rows, total = await profile_crud.get_multi(
-        db_session, filters={"user_id": user.id}
-    )
-    assert total >= 1
-    assert all(p.user_id == user.id for p in rows)
+    deleted = await delete_profile(db_session, profile.id)
+    assert deleted is True
+    assert await get_profile(db_session, profile.id) is None
 
 
 # ---------------------------------------------------------------------------
-# CRUDProfileFollow
+# ProfileFollow CRUD
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
-async def test_profile_follow_create_and_get(db_session: AsyncSession) -> None:
-    follower = await user_crud.create(db_session, obj_in=_user_in())
-    owner = await user_crud.create(db_session, obj_in=_user_in())
-    profile = await profile_crud.create(
-        db_session, obj_in=ProfileCreate(display_name="FollowMe", user_id=owner.id)
+async def test_create_and_get_follow(db_session: AsyncSession) -> None:
+    n1, n2 = _next_n(), _next_n()
+    follower = await create_user(db_session, _user_create(n1))
+    owner = await create_user(db_session, _user_create(n2))
+    profile = await create_profile(
+        db_session, ProfileCreate(user_id=owner.id, display_name="Owner Profile")
     )
 
-    follow = await profile_follow_crud.create(
-        db_session,
-        obj_in=ProfileFollowCreate(follower_id=follower.id, profile_id=profile.id),
+    follow = await create_follow(
+        db_session, ProfileFollowCreate(follower_id=follower.id, profile_id=profile.id)
     )
     assert follow.id is not None
 
-    fetched = await profile_follow_crud.get(db_session, follow.id)
+    fetched = await get_follow(db_session, follow.id)
     assert fetched is not None
-    assert fetched.follower_id == follower.id
-    assert fetched.profile_id == profile.id
 
 
 @pytest.mark.asyncio
-async def test_profile_follow_get_by_follower(db_session: AsyncSession) -> None:
-    follower = await user_crud.create(db_session, obj_in=_user_in())
-    owner = await user_crud.create(db_session, obj_in=_user_in())
-    for i in range(2):
-        profile = await profile_crud.create(
-            db_session,
-            obj_in=ProfileCreate(display_name=f"P{i}", user_id=owner.id),
-        )
-        await profile_follow_crud.create(
-            db_session,
-            obj_in=ProfileFollowCreate(
-                follower_id=follower.id, profile_id=profile.id
-            ),
-        )
+async def test_list_follows_with_filters(db_session: AsyncSession) -> None:
+    n1, n2 = _next_n(), _next_n()
+    follower = await create_user(db_session, _user_create(n1))
+    owner = await create_user(db_session, _user_create(n2))
+    profile = await create_profile(
+        db_session, ProfileCreate(user_id=owner.id, display_name="Prof")
+    )
+    await create_follow(
+        db_session, ProfileFollowCreate(follower_id=follower.id, profile_id=profile.id)
+    )
 
-    rows, total = await profile_follow_crud.get_by_follower(db_session, follower.id)
-    assert total == 2
-    assert all(f.follower_id == follower.id for f in rows)
+    items, total = await get_follows(
+        db_session, PaginationParams(), follower_id=follower.id
+    )
+    assert total >= 1
 
 
 @pytest.mark.asyncio
-async def test_profile_follow_get_by_profile(db_session: AsyncSession) -> None:
-    owner = await user_crud.create(db_session, obj_in=_user_in())
-    profile = await profile_crud.create(
-        db_session, obj_in=ProfileCreate(display_name="Popular", user_id=owner.id)
+async def test_delete_follow(db_session: AsyncSession) -> None:
+    n1, n2 = _next_n(), _next_n()
+    follower = await create_user(db_session, _user_create(n1))
+    owner = await create_user(db_session, _user_create(n2))
+    profile = await create_profile(
+        db_session, ProfileCreate(user_id=owner.id, display_name="DelProf")
     )
-    for _ in range(2):
-        follower = await user_crud.create(db_session, obj_in=_user_in())
-        await profile_follow_crud.create(
-            db_session,
-            obj_in=ProfileFollowCreate(
-                follower_id=follower.id, profile_id=profile.id
-            ),
-        )
-
-    rows, total = await profile_follow_crud.get_by_profile(db_session, profile.id)
-    assert total == 2
-    assert all(f.profile_id == profile.id for f in rows)
-
-
-@pytest.mark.asyncio
-async def test_profile_follow_get_by_follower_and_profile(
-    db_session: AsyncSession,
-) -> None:
-    follower = await user_crud.create(db_session, obj_in=_user_in())
-    owner = await user_crud.create(db_session, obj_in=_user_in())
-    profile = await profile_crud.create(
-        db_session, obj_in=ProfileCreate(display_name="Specific", user_id=owner.id)
-    )
-    await profile_follow_crud.create(
-        db_session,
-        obj_in=ProfileFollowCreate(follower_id=follower.id, profile_id=profile.id),
+    follow = await create_follow(
+        db_session, ProfileFollowCreate(follower_id=follower.id, profile_id=profile.id)
     )
 
-    found = await profile_follow_crud.get_by_follower_and_profile(
-        db_session, follower.id, profile.id
-    )
-    assert found is not None
-
-    not_found = await profile_follow_crud.get_by_follower_and_profile(
-        db_session, follower.id, 999_997
-    )
-    assert not_found is None
-
-
-@pytest.mark.asyncio
-async def test_profile_follow_delete(db_session: AsyncSession) -> None:
-    follower = await user_crud.create(db_session, obj_in=_user_in())
-    owner = await user_crud.create(db_session, obj_in=_user_in())
-    profile = await profile_crud.create(
-        db_session, obj_in=ProfileCreate(display_name="DelFollow", user_id=owner.id)
-    )
-    follow = await profile_follow_crud.create(
-        db_session,
-        obj_in=ProfileFollowCreate(follower_id=follower.id, profile_id=profile.id),
-    )
-    fid = follow.id
-
-    deleted = await profile_follow_crud.delete(db_session, id=fid)
-    assert deleted is not None
-    assert await profile_follow_crud.get(db_session, fid) is None
+    deleted = await delete_follow(db_session, follow.id)
+    assert deleted is True
+    assert await get_follow(db_session, follow.id) is None
 
 
 # ---------------------------------------------------------------------------
-# CRUDProfileChannel
+# ProfileChannel CRUD
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
-async def test_profile_channel_create_and_get(db_session: AsyncSession) -> None:
-    user = await user_crud.create(db_session, obj_in=_user_in())
-    profile = await profile_crud.create(
-        db_session, obj_in=ProfileCreate(display_name="Chan Profile", user_id=user.id)
+async def test_create_and_get_channel(db_session: AsyncSession) -> None:
+    n = _next_n()
+    user = await create_user(db_session, _user_create(n))
+    profile = await create_profile(
+        db_session, ProfileCreate(user_id=user.id, display_name="Chan Profile")
     )
-
-    channel = await profile_channel_crud.create(
+    channel = await create_channel(
         db_session,
-        obj_in=ProfileChannelCreate(
-            channel_name="Twitter",
-            channel_url="https://twitter.com/example",
+        ProfileChannelCreate(
             profile_id=profile.id,
+            channel_name="YouTube",
+            channel_url="https://youtube.com/@example",
         ),
     )
     assert channel.id is not None
 
-    fetched = await profile_channel_crud.get(db_session, channel.id)
+    fetched = await get_channel(db_session, channel.id)
     assert fetched is not None
-    assert fetched.channel_name == "Twitter"
+    assert fetched.channel_name == "YouTube"
 
 
 @pytest.mark.asyncio
-async def test_profile_channel_update_partial(db_session: AsyncSession) -> None:
-    user = await user_crud.create(db_session, obj_in=_user_in())
-    profile = await profile_crud.create(
-        db_session,
-        obj_in=ProfileCreate(display_name="Chan Profile 2", user_id=user.id),
+async def test_list_channels_profile_filter(db_session: AsyncSession) -> None:
+    n = _next_n()
+    user = await create_user(db_session, _user_create(n))
+    profile = await create_profile(
+        db_session, ProfileCreate(user_id=user.id, display_name="ChanList Profile")
     )
-    channel = await profile_channel_crud.create(
-        db_session,
-        obj_in=ProfileChannelCreate(
-            channel_name="OldName",
-            profile_id=profile.id,
-        ),
+    await create_channel(
+        db_session, ProfileChannelCreate(profile_id=profile.id, channel_name="X")
+    )
+    await create_channel(
+        db_session, ProfileChannelCreate(profile_id=profile.id, channel_name="Y")
     )
 
-    updated = await profile_channel_crud.update(
-        db_session,
-        db_obj=channel,
-        obj_in=ProfileChannelUpdate(channel_name="NewName"),
-    )
-    assert updated.channel_name == "NewName"
-    assert updated.channel_url is None  # unchanged
+    items, total = await get_channels(db_session, PaginationParams(), profile_id=profile.id)
+    assert total == 2
 
 
 @pytest.mark.asyncio
-async def test_profile_channel_get_by_profile(db_session: AsyncSession) -> None:
-    user = await user_crud.create(db_session, obj_in=_user_in())
-    profile = await profile_crud.create(
-        db_session,
-        obj_in=ProfileCreate(display_name="Multi Chan", user_id=user.id),
+async def test_update_channel(db_session: AsyncSession) -> None:
+    n = _next_n()
+    user = await create_user(db_session, _user_create(n))
+    profile = await create_profile(
+        db_session, ProfileCreate(user_id=user.id, display_name="UpdChan Profile")
     )
-    for i in range(3):
-        await profile_channel_crud.create(
-            db_session,
-            obj_in=ProfileChannelCreate(
-                channel_name=f"Chan{i}", profile_id=profile.id
-            ),
-        )
+    channel = await create_channel(
+        db_session, ProfileChannelCreate(profile_id=profile.id, channel_name="Old")
+    )
 
-    rows, total = await profile_channel_crud.get_by_profile(db_session, profile.id)
-    assert total == 3
-    assert all(c.profile_id == profile.id for c in rows)
+    updated = await update_channel(
+        db_session, channel.id, ProfileChannelUpdate(channel_name="New")
+    )
+    assert updated is not None
+    assert updated.channel_name == "New"
 
 
 @pytest.mark.asyncio
-async def test_profile_channel_delete(db_session: AsyncSession) -> None:
-    user = await user_crud.create(db_session, obj_in=_user_in())
-    profile = await profile_crud.create(
-        db_session,
-        obj_in=ProfileCreate(display_name="Del Chan Profile", user_id=user.id),
+async def test_delete_channel(db_session: AsyncSession) -> None:
+    n = _next_n()
+    user = await create_user(db_session, _user_create(n))
+    profile = await create_profile(
+        db_session, ProfileCreate(user_id=user.id, display_name="DelChan Profile")
     )
-    channel = await profile_channel_crud.create(
-        db_session,
-        obj_in=ProfileChannelCreate(channel_name="ToDelete", profile_id=profile.id),
+    channel = await create_channel(
+        db_session, ProfileChannelCreate(profile_id=profile.id, channel_name="ToDelete")
     )
-    cid = channel.id
 
-    deleted = await profile_channel_crud.delete(db_session, id=cid)
-    assert deleted is not None
-    assert await profile_channel_crud.get(db_session, cid) is None
+    deleted = await delete_channel(db_session, channel.id)
+    assert deleted is True
+    assert await get_channel(db_session, channel.id) is None

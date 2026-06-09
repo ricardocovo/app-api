@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 
+from app.api.routes import channels, follows, profiles, users
 from app.core.config import settings
 
 app = FastAPI(
@@ -15,9 +16,7 @@ async def health_check() -> dict:
     return {"status": "ok"}
 
 
-# Routers will be registered here in Phase 5.
-# from app.api.routes import users, profiles, follows, channels
-# app.include_router(users.router, prefix=settings.API_V1_PREFIX)
-# app.include_router(profiles.router, prefix=settings.API_V1_PREFIX)
-# app.include_router(follows.router, prefix=settings.API_V1_PREFIX)
-# app.include_router(channels.router, prefix=settings.API_V1_PREFIX)
+app.include_router(users.router, prefix=settings.API_V1_PREFIX)
+app.include_router(profiles.router, prefix=settings.API_V1_PREFIX)
+app.include_router(follows.router, prefix=settings.API_V1_PREFIX)
+app.include_router(channels.router, prefix=settings.API_V1_PREFIX)

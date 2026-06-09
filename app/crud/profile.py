@@ -1,35 +1,77 @@
-"""Profile CRUD module.
-
-Exposes a singleton ``profile_crud`` that extends ``CRUDBase`` with
-Profile-specific filter helpers.
-"""
+"""CRUD operations for the Profile entity."""
 
 from __future__ import annotations
 
-from typing import List, Tuple
+from typing import Optional, Tuple
 
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.crud.base import CRUDBase
 from app.models.profile import Profile
+from app.schemas.pagination import PaginationParams
 from app.schemas.profile import ProfileCreate, ProfileUpdate
 
 
-class CRUDProfile(CRUDBase[Profile, ProfileCreate, ProfileUpdate]):
-    """Profile-specific CRUD with extra filter helpers."""
+async def get_profiles(
+    db: AsyncSession,
+    params: PaginationParams,
+    user_id: Optional[int] = None,
+) -> Tuple[list[Profile], int]:
+    """Return a paginated list of profiles with optional user_id filter."""
+    query = select(Profile)
+    count_query = select(func.count()).select_from(Profile)
 
-    async def get_by_user(
-        self,
-        db: AsyncSession,
-        user_id: int,
-        *,
-        offset: int = 0,
-        limit: int = 20,
-    ) -> Tuple[List[Profile], int]:
-        """Return all profiles owned by *user_id* with pagination."""
-        return await self.get_multi(
-            db, offset=offset, limit=limit, filters={"user_id": user_id}
-        )
+    if user_id is not None:
+        query = query.where(Profile.user_id == user_id)
+        count_query = count_query.where(Profile.user_id == user_id)
+
+    total_result = await db.execute(count_query)
+    total = total_result.scalar_one()
+
+    query = query.offset(params.offset).limit(params.size)
+    result = await db.execute(query)
+    items = list(result.scalars().all())
+
+    return items, total
 
 
-profile_crud = CRUDProfile(Profile)
+async def get_profile(db: AsyncSession, profile_id: int) -> Optional[Profile]:
+    """Return a single profile by ID, or None if not found."""
+    result = await db.execute(select(Profile).where(Profile.id == profile_id))
+    return result.scalar_one_or_none()
+
+
+async def create_profile(db: AsyncSession, data: ProfileCreate) -> Profile:
+    """Create a new profile. Raises IntegrityError on FK violation."""
+    profile = Profile(**data.model_dump())
+    db.add(profile)
+    await db.commit()
+    await db.refresh(profile)
+    return profile
+
+
+async def update_profile(
+    db: AsyncSession, profile_id: int, data: ProfileUpdate
+) -> Optional[Profile]:
+    """Apply a partial update to a profile. Returns None if not found."""
+    profile = await get_profile(db, profile_id)
+    if profile is None:
+        return None
+
+    for field, value in data.model_dump(exclude_unset=True).items():
+        setattr(profile, field, value)
+
+    await db.commit()
+    await db.refresh(profile)
+    return profile
+
+
+async def delete_profile(db: AsyncSession, profile_id: int) -> bool:
+    """Delete a profile by ID. Returns False if not found."""
+    profile = await get_profile(db, profile_id)
+    if profile is None:
+        return False
+
+    await db.delete(profile)
+    await db.commit()
+    return True
