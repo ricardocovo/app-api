@@ -77,13 +77,19 @@ app-api/
 │   │   ├── profile.py          # Profile model
 │   │   ├── profile_follow.py   # ProfileFollow model
 │   │   └── profile_channel.py  # ProfileChannel model
-│   └── schemas/                # Pydantic request/response schemas
+│   └── schemas/                # Pydantic v2 request/response schemas
+│       ├── user.py             # User schemas
+│       ├── profile.py          # Profile schemas
+│       ├── profile_follow.py   # ProfileFollow schemas
+│       ├── profile_channel.py  # ProfileChannel schemas
+│       └── pagination.py       # PaginationParams + Page[T] wrapper
 ├── alembic/
 │   ├── env.py                  # Async-aware Alembic environment
 │   └── versions/               # Migration scripts
 ├── tests/                      # Pytest test suite
 │   ├── conftest.py             # Shared async fixtures (SQLite in-memory)
-│   └── test_models.py          # ORM model unit tests
+│   ├── test_models.py          # ORM model unit tests
+│   └── test_schemas.py         # Pydantic schema unit tests
 ├── scripts/                    # Utility scripts
 ├── requirements.txt            # Python dependencies
 ├── pytest.ini                  # Pytest configuration
@@ -127,6 +133,47 @@ User ──(1-N)──> ProfileFollow  (as follower)
 
 All FK columns use `ondelete="CASCADE"`.
 
+## Pydantic Schemas
+
+The `app/schemas/` package exposes **four variants** for every entity plus shared pagination utilities.
+
+### Schema conventions
+
+| Variant    | Purpose                                                    |
+|------------|------------------------------------------------------------|
+| `Base`     | Shared fields (inherited by `Create` and `Read`)           |
+| `Create`   | Required fields for insert; excludes server-generated fields (`id`, timestamps) |
+| `Update`   | All fields `Optional` for partial PATCH semantics          |
+| `Read`     | Full record (id + timestamps); `model_config = ConfigDict(from_attributes=True)` enables ORM-mode serialisation |
+
+- **Field naming**: API fields use **snake_case** (matching ORM attributes).
+- **Email validation**: `UserCreate` / `UserUpdate` use `pydantic.EmailStr` (requires `pydantic[email]`).
+- **URL validation**: `ProfileChannelCreate` / `ProfileChannelUpdate` use `pydantic.HttpUrl`.
+- **Auth tokens excluded**: `User.accessToken` / `User.refreshToken` are intentionally omitted this iteration.
+
+### Per-entity schemas
+
+| Entity           | Schemas                                                         |
+|------------------|-----------------------------------------------------------------|
+| `User`           | `UserBase`, `UserCreate`, `UserUpdate`, `UserRead`              |
+| `Profile`        | `ProfileBase`, `ProfileCreate`, `ProfileUpdate`, `ProfileRead`  |
+| `ProfileFollow`  | `ProfileFollowBase`, `ProfileFollowCreate`, `ProfileFollowUpdate`, `ProfileFollowRead` |
+| `ProfileChannel` | `ProfileChannelBase`, `ProfileChannelCreate`, `ProfileChannelUpdate`, `ProfileChannelRead` |
+
+### Pagination utilities
+
+`PaginationParams` captures `page` and `size` query parameters and exposes a computed `offset` property.  
+`Page[T]` is a generic response envelope:
+
+```python
+from app.schemas import Page, PaginationParams
+
+params = PaginationParams(page=2, size=10)
+page = Page.create(items=results, total=total_count, params=params)
+# → Page(items=[...], total=42, page=2, size=10, pages=5)
+```
+
+
 ## Dependencies
 
 - **fastapi** - Web framework
@@ -136,6 +183,7 @@ All FK columns use `ondelete="CASCADE"`.
 - **pyodbc** - ODBC database adapter
 - **alembic** - Database migration tool
 - **pydantic-settings** - Settings management
+- **pydantic[email]** - Data validation with email support (requires `email-validator`)
 - **python-dotenv** - Environment variable management
 - **pytest / pytest-asyncio / aiosqlite** - Test infrastructure
 
