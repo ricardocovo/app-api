@@ -414,7 +414,22 @@ graph LR
 - **pydantic-settings** - Settings management
 - **pydantic[email]** - Data validation with email support (requires `email-validator`)
 - **python-dotenv** - Environment variable management
+- **slowapi** - FastAPI-compatible rate-limiting (wraps the `limits` package)
 - **pytest / pytest-asyncio / aiosqlite** - Test infrastructure
+
+## Rate Limiting
+
+All routes under `/api/v1` are protected by a **per-IP rate limit of 100 requests per minute**. Requests that exceed the limit receive:
+
+- **Status**: `429 Too Many Requests`
+- **Header**: `Retry-After: <seconds>` — seconds until the window resets
+- **Body**: `{"error": "Rate limit exceeded: 100 per 1 minute"}`
+
+The `/health` endpoint is **exempt** from rate limiting so that health checks never interfere with the limit.
+
+The limit is implemented via [`slowapi`](https://github.com/laurents/slowapi) (`SlowAPIMiddleware`) and the `Limiter` instance lives in `app/core/limiter.py`.
+
+> **Multi-worker deployments**: By default, counters are stored in memory (single-process only). Set `REDIS_URL` to share counters across workers/instances.
 
 ## Configuration
 
@@ -423,6 +438,8 @@ Configuration is managed through environment variables in the `.env` file:
 - `DATABASE_URL`: SQL Server connection string
 - `APP_ENV`: Application environment (development, production)
 - `API_V1_PREFIX`: API version prefix (default: `/api/v1`)
+- `RATE_LIMIT`: Rate limit per IP (default: `100/minute`)
+- `REDIS_URL`: Optional Redis URL for shared rate-limit storage across workers (default: in-memory)
 
 ## Development
 

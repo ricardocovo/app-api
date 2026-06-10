@@ -12,5 +12,9 @@ class Settings(BaseSettings):
     APP_ENV: str = "development"
     API_V1_PREFIX: str = "/api/v1"
 
+    # Rate limiting
+    RATE_LIMIT: str = "100/minute"
+    REDIS_URL: str | None = None
+
 
 settings = Settings()
