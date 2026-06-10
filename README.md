@@ -223,6 +223,43 @@ Tests use an in-memory SQLite database and do **not** require a running SQL Serv
 pytest
 ```
 
+**Test Structure:**
+- `tests/test_utils.py` - Reusable test utilities and helper functions
+- `tests/test_models.py` - ORM model unit tests
+- `tests/test_schemas.py` - Pydantic schema validation tests
+- `tests/test_crud.py` - CRUD operation tests
+- `tests/test_routes.py` - Basic route integration tests
+- `tests/test_users_e2e.py` - Comprehensive User E2E tests (60+ tests)
+- `tests/test_profiles_e2e.py` - Comprehensive Profile E2E tests (40+ tests)
+- `tests/test_follows_e2e.py` - Comprehensive Follow E2E tests (30+ tests)
+- `tests/test_channels_e2e.py` - Comprehensive Channel E2E tests (35+ tests)
+
+**Run specific test files:**
+```bash
+# E2E tests for users
+pytest tests/test_users_e2e.py -v
+
+# E2E tests for profiles
+pytest tests/test_profiles_e2e.py -v
+
+# E2E tests for follows
+pytest tests/test_follows_e2e.py -v
+
+# E2E tests for channels
+pytest tests/test_channels_e2e.py -v
+
+# Run all tests with coverage
+pytest tests/ -v --cov=app
+```
+
+**E2E Test Coverage:**
+The E2E tests cover over 180 scenarios including:
+- **Happy path operations**: Create, read, list, update, delete for each entity
+- **Error cases**: Invalid FK references, duplicate records, missing fields, invalid types
+- **Pagination**: Valid/invalid page sizes, boundary conditions
+- **Cascading deletes**: Verify that deleting parent entities properly cascades
+- **Workflows**: Realistic multi-step user journeys (registration, profile setup, social interactions)
+
 ### API Routes
 
 Routes are organized in `app/api/routes/`. To add new endpoints:
