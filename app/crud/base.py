@@ -7,6 +7,7 @@ CRUD operations using SQLAlchemy 2.0 async-style ``select()`` queries.
 from __future__ import annotations
 
 from typing import Any, Dict, Generic, List, Optional, Tuple, Type, TypeVar, Union
+from uuid import UUID
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -35,7 +36,7 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
     def __init__(self, model: Type[ModelType]) -> None:
         self.model = model
 
-    async def get(self, db: AsyncSession, id: int) -> Optional[ModelType]:
+    async def get(self, db: AsyncSession, id: UUID) -> Optional[ModelType]:
         """Return the record with the given primary key, or ``None``."""
         result = await db.execute(select(self.model).where(self.model.id == id))
         return result.scalars().first()
@@ -128,7 +129,7 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         await db.refresh(db_obj)
         return db_obj
 
-    async def delete(self, db: AsyncSession, *, id: int) -> Optional[ModelType]:
+    async def delete(self, db: AsyncSession, *, id: UUID) -> Optional[ModelType]:
         """Delete the record with the given primary key.
 
         Returns the deleted object (pre-deletion state), or ``None`` if not

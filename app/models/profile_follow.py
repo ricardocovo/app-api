@@ -9,10 +9,11 @@ ERD camelCase fields map to snake_case Python attributes:
 
 from __future__ import annotations
 
+import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import ForeignKey, UniqueConstraint, func
+from sqlalchemy import ForeignKey, UniqueConstraint, Uuid, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -25,20 +26,20 @@ if TYPE_CHECKING:
 class ProfileFollow(Base):
     """Records that a user (follower) follows a profile."""
 
-    __tablename__ = "profile_follows"
+    __tablename__ = "profile_follow"
     __table_args__ = (
-        UniqueConstraint("follower_id", "profile_id", name="uq_profile_follow"),
+        UniqueConstraint("followerId", "profileId", name="uq_profile_follow"),
     )
 
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    follower_id: Mapped[int] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    follower_id: Mapped[uuid.UUID] = mapped_column(
+        "followerId", Uuid(as_uuid=True), ForeignKey("user.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    profile_id: Mapped[int] = mapped_column(
-        ForeignKey("profiles.id", ondelete="CASCADE"), nullable=False, index=True
+    profile_id: Mapped[uuid.UUID] = mapped_column(
+        "profileId", Uuid(as_uuid=True), ForeignKey("profile.id", ondelete="CASCADE"), nullable=False, index=True
     )
     created_at: Mapped[datetime] = mapped_column(
-        server_default=func.now(), nullable=False
+        "createdAt", server_default=func.now(), nullable=False
     )
 
     # Relationships

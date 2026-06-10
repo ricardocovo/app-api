@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Optional, Tuple
+from uuid import UUID
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,8 +16,8 @@ from app.schemas.profile_follow import ProfileFollowCreate
 async def get_follows(
     db: AsyncSession,
     params: PaginationParams,
-    follower_id: Optional[int] = None,
-    profile_id: Optional[int] = None,
+    follower_id: Optional[UUID] = None,
+    profile_id: Optional[UUID] = None,
 ) -> Tuple[list[ProfileFollow], int]:
     """Return a paginated list of follows with optional filters."""
     query = select(ProfileFollow)
@@ -33,14 +34,14 @@ async def get_follows(
     total_result = await db.execute(count_query)
     total = total_result.scalar_one()
 
-    query = query.offset(params.offset).limit(params.size)
+    query = query.order_by(ProfileFollow.id).offset(params.offset).limit(params.size)
     result = await db.execute(query)
     items = list(result.scalars().all())
 
     return items, total
 
 
-async def get_follow(db: AsyncSession, follow_id: int) -> Optional[ProfileFollow]:
+async def get_follow(db: AsyncSession, follow_id: UUID) -> Optional[ProfileFollow]:
     """Return a single follow by ID, or None if not found."""
     result = await db.execute(
         select(ProfileFollow).where(ProfileFollow.id == follow_id)
@@ -59,7 +60,7 @@ async def create_follow(
     return follow
 
 
-async def delete_follow(db: AsyncSession, follow_id: int) -> bool:
+async def delete_follow(db: AsyncSession, follow_id: UUID) -> bool:
     """Delete a follow by ID. Returns False if not found."""
     follow = await get_follow(db, follow_id)
     if follow is None:

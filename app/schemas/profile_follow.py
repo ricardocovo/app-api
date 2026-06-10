@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
@@ -10,8 +11,8 @@ from pydantic import BaseModel, ConfigDict
 class ProfileFollowBase(BaseModel):
     """Fields shared by all ProfileFollow schema variants."""
 
-    follower_id: int
-    profile_id: int
+    follower_id: UUID
+    profile_id: UUID
 
 
 class ProfileFollowCreate(ProfileFollowBase):
@@ -34,5 +35,5 @@ class ProfileFollowRead(ProfileFollowBase):
 
     model_config = ConfigDict(from_attributes=True)
 
-    id: int
+    id: UUID
     created_at: datetime

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Optional, Tuple
+from uuid import UUID
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,7 +16,7 @@ from app.schemas.profile import ProfileCreate, ProfileUpdate
 async def get_profiles(
     db: AsyncSession,
     params: PaginationParams,
-    user_id: Optional[int] = None,
+    user_id: Optional[UUID] = None,
 ) -> Tuple[list[Profile], int]:
     """Return a paginated list of profiles with optional user_id filter."""
     query = select(Profile)
@@ -28,14 +29,14 @@ async def get_profiles(
     total_result = await db.execute(count_query)
     total = total_result.scalar_one()
 
-    query = query.offset(params.offset).limit(params.size)
+    query = query.order_by(Profile.id).offset(params.offset).limit(params.size)
     result = await db.execute(query)
     items = list(result.scalars().all())
 
     return items, total
 
 
-async def get_profile(db: AsyncSession, profile_id: int) -> Optional[Profile]:
+async def get_profile(db: AsyncSession, profile_id: UUID) -> Optional[Profile]:
     """Return a single profile by ID, or None if not found."""
     result = await db.execute(select(Profile).where(Profile.id == profile_id))
     return result.scalar_one_or_none()
@@ -51,7 +52,7 @@ async def create_profile(db: AsyncSession, data: ProfileCreate) -> Profile:
 
 
 async def update_profile(
-    db: AsyncSession, profile_id: int, data: ProfileUpdate
+    db: AsyncSession, profile_id: UUID, data: ProfileUpdate
 ) -> Optional[Profile]:
     """Apply a partial update to a profile. Returns None if not found."""
     profile = await get_profile(db, profile_id)
@@ -66,7 +67,7 @@ async def update_profile(
     return profile
 
 
-async def delete_profile(db: AsyncSession, profile_id: int) -> bool:
+async def delete_profile(db: AsyncSession, profile_id: UUID) -> bool:
     """Delete a profile by ID. Returns False if not found."""
     profile = await get_profile(db, profile_id)
     if profile is None:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Optional
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.exc import IntegrityError
@@ -26,7 +27,7 @@ router = APIRouter(prefix="/profiles", tags=["profiles"])
 async def list_profiles(
     page: int = Query(default=1, ge=1),
     size: int = Query(default=20, ge=1, le=100),
-    user_id: Optional[int] = Query(default=None),
+    user_id: Optional[UUID] = Query(default=None),
     db: AsyncSession = Depends(get_db),
 ) -> Page[ProfileRead]:
     params = PaginationParams(page=page, size=size)
@@ -36,7 +37,7 @@ async def list_profiles(
 
 @router.get("/{profile_id}", response_model=ProfileRead)
 async def read_profile(
-    profile_id: int,
+    profile_id: UUID,
     db: AsyncSession = Depends(get_db),
 ) -> ProfileRead:
     profile = await get_profile(db, profile_id)
@@ -62,7 +63,7 @@ async def create_new_profile(
 
 @router.patch("/{profile_id}", response_model=ProfileRead)
 async def patch_profile(
-    profile_id: int,
+    profile_id: UUID,
     data: ProfileUpdate,
     db: AsyncSession = Depends(get_db),
 ) -> ProfileRead:
@@ -81,7 +82,7 @@ async def patch_profile(
 
 @router.delete("/{profile_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def remove_profile(
-    profile_id: int,
+    profile_id: UUID,
     db: AsyncSession = Depends(get_db),
 ) -> None:
     deleted = await delete_profile(db, profile_id)

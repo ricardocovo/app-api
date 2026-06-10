@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Optional
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.exc import IntegrityError
@@ -30,7 +31,7 @@ async def list_users(
 
 @router.get("/{user_id}", response_model=UserRead)
 async def read_user(
-    user_id: int,
+    user_id: UUID,
     db: AsyncSession = Depends(get_db),
 ) -> UserRead:
     user = await get_user(db, user_id)
@@ -56,7 +57,7 @@ async def create_new_user(
 
 @router.patch("/{user_id}", response_model=UserRead)
 async def patch_user(
-    user_id: int,
+    user_id: UUID,
     data: UserUpdate,
     db: AsyncSession = Depends(get_db),
 ) -> UserRead:
@@ -75,7 +76,7 @@ async def patch_user(
 
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def remove_user(
-    user_id: int,
+    user_id: UUID,
     db: AsyncSession = Depends(get_db),
 ) -> None:
     deleted = await delete_user(db, user_id)

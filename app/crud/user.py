@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Optional, Tuple
+from uuid import UUID
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -28,14 +29,14 @@ async def get_users(
     total_result = await db.execute(count_query)
     total = total_result.scalar_one()
 
-    query = query.offset(params.offset).limit(params.size)
+    query = query.order_by(User.id).offset(params.offset).limit(params.size)
     result = await db.execute(query)
     items = list(result.scalars().all())
 
     return items, total
 
 
-async def get_user(db: AsyncSession, user_id: int) -> Optional[User]:
+async def get_user(db: AsyncSession, user_id: UUID) -> Optional[User]:
     """Return a single user by ID, or None if not found."""
     result = await db.execute(select(User).where(User.id == user_id))
     return result.scalar_one_or_none()
@@ -51,7 +52,7 @@ async def create_user(db: AsyncSession, data: UserCreate) -> User:
 
 
 async def update_user(
-    db: AsyncSession, user_id: int, data: UserUpdate
+    db: AsyncSession, user_id: UUID, data: UserUpdate
 ) -> Optional[User]:
     """Apply a partial update to a user. Returns None if not found."""
     user = await get_user(db, user_id)
@@ -66,7 +67,7 @@ async def update_user(
     return user
 
 
-async def delete_user(db: AsyncSession, user_id: int) -> bool:
+async def delete_user(db: AsyncSession, user_id: UUID) -> bool:
     """Delete a user by ID. Returns False if not found."""
     user = await get_user(db, user_id)
     if user is None:

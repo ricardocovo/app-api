@@ -2,33 +2,32 @@
 
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Optional
+from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, HttpUrl
+from pydantic import BaseModel, ConfigDict
 
 
 class ProfileChannelBase(BaseModel):
     """Fields shared by all ProfileChannel schema variants."""
 
-    channel_name: str
-    channel_url: Optional[HttpUrl] = None
+    youtube_channel_id: str
+    channel_title: str
+    thumbnail_url: Optional[str] = None
 
 
 class ProfileChannelCreate(ProfileChannelBase):
-    """Fields required to create a new ProfileChannel.
+    """Fields required to create a new ProfileChannel."""
 
-    ``profile_id`` is required at creation; server-generated fields are excluded.
-    """
-
-    profile_id: int
+    profile_id: UUID
 
 
 class ProfileChannelUpdate(BaseModel):
     """All fields optional for partial PATCH updates."""
 
-    channel_name: Optional[str] = None
-    channel_url: Optional[HttpUrl] = None
+    youtube_channel_id: Optional[str] = None
+    channel_title: Optional[str] = None
+    thumbnail_url: Optional[str] = None
 
 
 class ProfileChannelRead(ProfileChannelBase):
@@ -36,7 +35,5 @@ class ProfileChannelRead(ProfileChannelBase):
 
     model_config = ConfigDict(from_attributes=True)
 
-    id: int
-    profile_id: int
-    created_at: datetime
-    updated_at: datetime
+    id: UUID
+    profile_id: UUID

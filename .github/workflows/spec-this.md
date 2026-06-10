@@ -35,4 +35,6 @@ who will implement this work.
 
 Update the issue with all the new specifications. *DO NOT delete*  any content. Append to the existing issue description.
 
+Update the title with something representative of the changes required.
+
 Add a comment stating you have updated the issue.

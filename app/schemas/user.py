@@ -1,15 +1,10 @@
-"""Pydantic v2 schemas for the User entity.
-
-API field names use snake_case throughout (matching the ORM attribute names).
-
-Intentionally excluded:
-- ``access_token`` / ``refresh_token`` – dropped for this iteration (no auth).
-"""
+"""Pydantic v2 schemas for the User entity."""
 
 from __future__ import annotations
 
 from datetime import datetime
 from typing import Optional
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr
 
@@ -17,35 +12,36 @@ from pydantic import BaseModel, ConfigDict, EmailStr
 class UserBase(BaseModel):
     """Fields shared by all User schema variants."""
 
-    username: str
     email: EmailStr
+    name: Optional[str] = None
 
 
 class UserCreate(UserBase):
-    """Fields required to create a new User.
+    """Fields required to create a new User."""
 
-    Server-generated fields (``id``, ``created_at``) are excluded.
-    """
-
-    password_hash: str
+    google_id: Optional[str] = None
+    avatar_url: Optional[str] = None
+    access_token: Optional[str] = None
+    refresh_token: Optional[str] = None
 
 
 class UserUpdate(BaseModel):
     """All fields optional for partial PATCH updates."""
 
-    username: Optional[str] = None
+    name: Optional[str] = None
     email: Optional[EmailStr] = None
-    password_hash: Optional[str] = None
+    avatar_url: Optional[str] = None
+    access_token: Optional[str] = None
+    refresh_token: Optional[str] = None
 
 
 class UserRead(UserBase):
-    """Full User record returned by the API.
-
-    ``password_hash`` is intentionally excluded from read responses.
-    ``model_config`` enables ORM-mode serialisation.
-    """
+    """Full User record returned by the API."""
 
     model_config = ConfigDict(from_attributes=True)
 
-    id: int
+    id: UUID
+    google_id: Optional[str] = None
+    avatar_url: Optional[str] = None
     created_at: datetime
+    updated_at: datetime

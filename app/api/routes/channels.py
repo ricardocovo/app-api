@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Optional
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.exc import IntegrityError
@@ -30,7 +31,7 @@ router = APIRouter(prefix="/channels", tags=["channels"])
 async def list_channels(
     page: int = Query(default=1, ge=1),
     size: int = Query(default=20, ge=1, le=100),
-    profile_id: Optional[int] = Query(default=None),
+    profile_id: Optional[UUID] = Query(default=None),
     db: AsyncSession = Depends(get_db),
 ) -> Page[ProfileChannelRead]:
     params = PaginationParams(page=page, size=size)
@@ -40,7 +41,7 @@ async def list_channels(
 
 @router.get("/{channel_id}", response_model=ProfileChannelRead)
 async def read_channel(
-    channel_id: int,
+    channel_id: UUID,
     db: AsyncSession = Depends(get_db),
 ) -> ProfileChannelRead:
     channel = await get_channel(db, channel_id)
@@ -66,7 +67,7 @@ async def create_new_channel(
 
 @router.patch("/{channel_id}", response_model=ProfileChannelRead)
 async def patch_channel(
-    channel_id: int,
+    channel_id: UUID,
     data: ProfileChannelUpdate,
     db: AsyncSession = Depends(get_db),
 ) -> ProfileChannelRead:
@@ -85,7 +86,7 @@ async def patch_channel(
 
 @router.delete("/{channel_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def remove_channel(
-    channel_id: int,
+    channel_id: UUID,
     db: AsyncSession = Depends(get_db),
 ) -> None:
     deleted = await delete_channel(db, channel_id)

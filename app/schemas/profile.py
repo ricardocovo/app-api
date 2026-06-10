@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
@@ -11,24 +11,23 @@ from pydantic import BaseModel, ConfigDict
 class ProfileBase(BaseModel):
     """Fields shared by all Profile schema variants."""
 
-    display_name: str
-    bio: Optional[str] = None
+    name: str
+    is_default: bool = False
+    is_public: bool = True
 
 
 class ProfileCreate(ProfileBase):
-    """Fields required to create a new Profile.
+    """Fields required to create a new Profile."""
 
-    ``user_id`` is required at creation; server-generated fields are excluded.
-    """
-
-    user_id: int
+    user_id: UUID
 
 
 class ProfileUpdate(BaseModel):
     """All fields optional for partial PATCH updates."""
 
-    display_name: Optional[str] = None
-    bio: Optional[str] = None
+    name: str | None = None
+    is_default: bool | None = None
+    is_public: bool | None = None
 
 
 class ProfileRead(ProfileBase):
@@ -36,7 +35,7 @@ class ProfileRead(ProfileBase):
 
     model_config = ConfigDict(from_attributes=True)
 
-    id: int
-    user_id: int
+    id: UUID
+    user_id: UUID
     created_at: datetime
     updated_at: datetime

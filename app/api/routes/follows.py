@@ -6,6 +6,7 @@ ProfileFollow omits PATCH – create/delete only.
 from __future__ import annotations
 
 from typing import Optional
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.exc import IntegrityError
@@ -23,8 +24,8 @@ router = APIRouter(prefix="/follows", tags=["follows"])
 async def list_follows(
     page: int = Query(default=1, ge=1),
     size: int = Query(default=20, ge=1, le=100),
-    follower_id: Optional[int] = Query(default=None),
-    profile_id: Optional[int] = Query(default=None),
+    follower_id: Optional[UUID] = Query(default=None),
+    profile_id: Optional[UUID] = Query(default=None),
     db: AsyncSession = Depends(get_db),
 ) -> Page[ProfileFollowRead]:
     params = PaginationParams(page=page, size=size)
@@ -34,7 +35,7 @@ async def list_follows(
 
 @router.get("/{follow_id}", response_model=ProfileFollowRead)
 async def read_follow(
-    follow_id: int,
+    follow_id: UUID,
     db: AsyncSession = Depends(get_db),
 ) -> ProfileFollowRead:
     follow = await get_follow(db, follow_id)
@@ -60,7 +61,7 @@ async def create_new_follow(
 
 @router.delete("/{follow_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def remove_follow(
-    follow_id: int,
+    follow_id: UUID,
     db: AsyncSession = Depends(get_db),
 ) -> None:
     deleted = await delete_follow(db, follow_id)

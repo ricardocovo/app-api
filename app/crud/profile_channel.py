@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Optional, Tuple
+from uuid import UUID
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,7 +16,7 @@ from app.schemas.profile_channel import ProfileChannelCreate, ProfileChannelUpda
 async def get_channels(
     db: AsyncSession,
     params: PaginationParams,
-    profile_id: Optional[int] = None,
+    profile_id: Optional[UUID] = None,
 ) -> Tuple[list[ProfileChannel], int]:
     """Return a paginated list of channels with optional profile_id filter."""
     query = select(ProfileChannel)
@@ -28,7 +29,7 @@ async def get_channels(
     total_result = await db.execute(count_query)
     total = total_result.scalar_one()
 
-    query = query.offset(params.offset).limit(params.size)
+    query = query.order_by(ProfileChannel.id).offset(params.offset).limit(params.size)
     result = await db.execute(query)
     items = list(result.scalars().all())
 
@@ -36,7 +37,7 @@ async def get_channels(
 
 
 async def get_channel(
-    db: AsyncSession, channel_id: int
+    db: AsyncSession, channel_id: UUID
 ) -> Optional[ProfileChannel]:
     """Return a single channel by ID, or None if not found."""
     result = await db.execute(
@@ -49,11 +50,7 @@ async def create_channel(
     db: AsyncSession, data: ProfileChannelCreate
 ) -> ProfileChannel:
     """Create a new channel. Raises IntegrityError on FK violation."""
-    channel = ProfileChannel(
-        profile_id=data.profile_id,
-        channel_name=data.channel_name,
-        channel_url=str(data.channel_url) if data.channel_url is not None else None,
-    )
+    channel = ProfileChannel(**data.model_dump())
     db.add(channel)
     await db.commit()
     await db.refresh(channel)
@@ -61,7 +58,7 @@ async def create_channel(
 
 
 async def update_channel(
-    db: AsyncSession, channel_id: int, data: ProfileChannelUpdate
+    db: AsyncSession, channel_id: UUID, data: ProfileChannelUpdate
 ) -> Optional[ProfileChannel]:
     """Apply a partial update to a channel. Returns None if not found."""
     channel = await get_channel(db, channel_id)
@@ -80,7 +77,7 @@ async def update_channel(
     return channel
 
 
-async def delete_channel(db: AsyncSession, channel_id: int) -> bool:
+async def delete_channel(db: AsyncSession, channel_id: UUID) -> bool:
     """Delete a channel by ID. Returns False if not found."""
     channel = await get_channel(db, channel_id)
     if channel is None:
