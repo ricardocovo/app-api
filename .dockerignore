@@ -1,0 +1,48 @@
+# Version control and repository metadata
+.git
+.gitignore
+.gitattributes
+.github/
+
+# Python virtual environments
+.venv/
+venv/
+env/
+
+# Python caches and compiled artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Tooling and test artifacts
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+tests/
+pytest.ini
+
+# Environment files
+.env
+.env.*
+
+# Local databases
+*.sqlite
+*.sqlite3
+*.db
+
+# Documentation, schema dumps, and helper scripts
+README.md
+db-schema.sql
+scripts/
+
+# Docker build files not needed inside the context
+Dockerfile
+.dockerignore
+
+# Logs, editor, and OS files
+*.log
+*.swp
+.DS_Store
+.idea/
+.vscode/

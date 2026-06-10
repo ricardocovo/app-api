@@ -538,3 +538,56 @@ Response: `{"status": "ok"}`
 ## License
 
 [Add your license information here]
+
+## Container & Azure deployment
+
+### Building and running locally
+
+Build the container image from the repository root:
+
+```bash
+docker build -t app-api:local .
+```
+
+Run it locally with your SQL Server connection string:
+
+```bash
+docker run --rm -p 8000:8000 -e DATABASE_URL="<your mssql aioodbc url>" app-api:local
+```
+
+The image includes the Microsoft ODBC Driver 18 for SQL Server, which is required by `pyodbc` and `aioodbc`. Use `GET /health` as a liveness check.
+
+### Azure prerequisites
+
+The following resources must exist before the GitHub Actions workflow runs:
+
+- Resource group (default `app-api-rg`)
+- Azure Container Registry (default `appapiacr`; ACR names cannot contain hyphens)
+- Container Apps Environment (default `app-api-env`)
+- Container App (default `app-api-app`), initially deployed with any placeholder image such as `mcr.microsoft.com/k8se/quickstart:latest`; the workflow updates the image.
+- A **user-assigned managed identity** (default `app-api-identity`) attached to the Container App with:
+  - `AcrPull` role on the ACR
+  - `get` permission on the Key Vault secret holding `DATABASE_URL`
+- An **app registration** with a **federated credential** trusting `repo:ricardocovo/app-api:ref:refs/heads/main` and, if desired for manual runs, `repo:ricardocovo/app-api:ref:refs/heads/*`. Grant it `AcrPush` on the ACR and `Contributor` on the Container App, or the more scoped `Container Apps Contributor` role.
+- A **Key Vault secret** containing the SQL Server `DATABASE_URL` value, including the full `mssql+aioodbc://...` URL.
+
+### Required GitHub repository secrets and variables
+
+Use GitHub repository secrets for sensitive identifiers:
+
+- `AZURE_CLIENT_ID` — federated app registration client ID
+- `AZURE_TENANT_ID`
+- `AZURE_SUBSCRIPTION_ID`
+- `KEYVAULT_DATABASE_URL_SECRET_URI` — full Key Vault secret URI, for example `https://my-kv.vault.azure.net/secrets/database-url`
+- `CONTAINER_APP_IDENTITY_ID` — resource ID of the user-assigned identity attached to the Container App, used for the Key Vault reference
+
+Use GitHub repository variables for non-sensitive names:
+
+- `AZURE_RESOURCE_GROUP` (for example, `app-api-rg`)
+- `ACR_NAME` (for example, `appapiacr`)
+- `ACR_LOGIN_SERVER` (for example, `appapiacr.azurecr.io`)
+- `CONTAINER_APP_NAME` (for example, `app-api-app`)
+
+### How the workflow works
+
+The workflow is triggered on pushes to `main` or by manual dispatch. It uses OIDC to log in to Azure, builds and pushes the image to ACR tagged with both `latest` and the commit SHA, (re)binds the Container App secret `database-url` to the Key Vault secret through the attached user-assigned identity, and runs `az containerapp update` to roll out the new image with `DATABASE_URL=secretref:database-url`. Migrations are **not** run automatically.
