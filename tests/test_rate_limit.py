@@ -82,10 +82,10 @@ async def test_under_limit_all_succeed(rl_db: AsyncSession) -> None:
             transport=ASGITransport(app=app), base_url="http://test"
         ) as client:
             with patch(_KEY_PATCH, return_value="10.0.0.1"):
-                for i in range(99):
+                for i, _ in enumerate(range(99), start=1):
                     r = await client.get(_COUNTED_URL)
                     assert r.status_code != 429, (
-                        f"Request {i + 1} was rate-limited unexpectedly"
+                        f"Request {i} was rate-limited unexpectedly"
                     )
     finally:
         app.dependency_overrides.clear()
@@ -104,10 +104,10 @@ async def test_at_limit_100th_succeeds(rl_db: AsyncSession) -> None:
             transport=ASGITransport(app=app), base_url="http://test"
         ) as client:
             with patch(_KEY_PATCH, return_value="10.0.0.2"):
-                for i in range(100):
+                for i, _ in enumerate(range(100), start=1):
                     r = await client.get(_COUNTED_URL)
                     assert r.status_code != 429, (
-                        f"Request {i + 1} was rate-limited unexpectedly"
+                        f"Request {i} was rate-limited unexpectedly"
                     )
     finally:
         app.dependency_overrides.clear()
@@ -181,10 +181,10 @@ async def test_health_endpoint_exempt(rl_db: AsyncSession) -> None:
         ) as client:
             with patch(_KEY_PATCH, return_value="10.0.2.1"):
                 # Send well over the limit exclusively to the exempt /health endpoint
-                for i in range(150):
+                for i, _ in enumerate(range(150), start=1):
                     r = await client.get("/health")
                     assert r.status_code == 200, (
-                        f"Health check {i + 1} returned {r.status_code}"
+                        f"Health check {i} returned {r.status_code}"
                     )
     finally:
         app.dependency_overrides.clear()
