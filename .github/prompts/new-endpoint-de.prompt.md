@@ -18,3 +18,7 @@ Diese API stellt einen neuen Endpoint zur Verwaltung von Klicks auf ein Video be
 # Implementierungsdetails
 
 Führe eine vollständige Implementierung von Modell, CRUD und API-Endpoint durch.
+
+# Notizen
+
+Auf Deutsch kommunizieren
