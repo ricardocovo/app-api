@@ -18,3 +18,7 @@ Esta API expondrá un nuevo endpoint para gestionar clics en un video. Queremos 
 # Detalles de Implementación
 
 Realiza una implementación completa del Modelo, CRUD y endpoint de API.
+
+# Notas
+
+Comunicate en Español.
