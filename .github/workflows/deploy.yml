@@ -1,13 +1,6 @@
 name: Deploy to Azure Container App
 
 on:
-  push:
-    branches:
-      - main
-    paths-ignore:
-      - '**/*.md'
-      - 'tests/**'
-      - '.github/workflows/spec-this.*'
   workflow_dispatch:
     inputs:
       image_tag:
