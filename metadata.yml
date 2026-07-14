@@ -1,0 +1,7 @@
+appid: AB1234
+appname: abc
+owner:
+  - ricardo@example.com
+  - ricardo-team@example.com
+tags:
+  - backend
