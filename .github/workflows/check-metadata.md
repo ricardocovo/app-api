@@ -1,4 +1,6 @@
 ---
+name: Metadata Audit
+
 on:
   schedule: daily
   workflow_dispatch:
