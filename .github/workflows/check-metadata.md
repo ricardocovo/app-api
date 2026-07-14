@@ -9,8 +9,8 @@ permissions:
 
 safe-outputs:  
   create-issue:
-    title-prefix: "[Metadata Failure] "
-    labels: [automation]
+    title-prefix: "[Metadata Audit] "
+    labels: [automation, metadata]
     max: 1
     close-older-issues: true
     deduplicate-by-title: 1
