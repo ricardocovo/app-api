@@ -1,0 +1,6 @@
+appid: 123
+appname: abc
+owner:
+  - ricard  
+tags:
+  - backend
