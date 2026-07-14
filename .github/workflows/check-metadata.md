@@ -44,7 +44,7 @@ tags:
 Definition:
 
 - appid: formatted as`^[A-Z]{2}\d{4}$`
-- appname: name with no spaces, no longer than 128 characters
+- appname: name with no spaces, between 8 and 128 characters long
 - owners: list of emails, at least 2 required.
 - tags: list of tags, at least 1 required
 
